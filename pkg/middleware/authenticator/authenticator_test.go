@@ -22,6 +22,10 @@ func TestAuthenticatorHTTPMux(t *testing.T) {
 		authenticatorMd(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			profile, err := Authentication(request.Context())
 			if err != nil {
+				if err == ErrNoAuthentication {
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
+				}
 				t.Fatal(err)
 			}
 			data := profile.(string)
@@ -39,21 +43,27 @@ func TestAuthenticatorHTTPMux(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		args args
-		want []byte
+		name     string
+		args     args
+		wantCode int
+		wantBody []byte
 	}{
-		{name: "GET", args: args{method: "GET", path: "/get"}, want: []byte("USERAUTH")},
-		// TODO: write for other methods
+		{name: "GET", args: args{method: "GET", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "POST", args: args{method: "POST", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "POST2", args: args{method: "POST", path: "/post"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
 	}
 
 	for _, tt := range tests {
 		request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, request)
-		got := response.Body.Bytes()
-		if !bytes.Equal(tt.want, got) {
-			t.Errorf("got %s, want %s", got, tt.want)
+		gotCode := response.Code
+		if tt.wantCode != gotCode {
+			t.Errorf("%s: got %d, wantCode %d", tt.name, gotCode, tt.wantCode)
+		}
+		gotBytes := response.Body.Bytes()
+		if !bytes.Equal(tt.wantBody, gotBytes) {
+			t.Errorf("%s: got %s, want %s", tt.name, gotBytes, tt.wantBody)
 		}
 	}
 }
@@ -71,6 +81,10 @@ func TestAuthenticatorChi(t *testing.T) {
 		func(writer http.ResponseWriter, request *http.Request) {
 			profile, err := Authentication(request.Context())
 			if err != nil {
+				if err == ErrNoAuthentication {
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
+				}
 				t.Fatal(err)
 			}
 			data := profile.(string)
@@ -88,21 +102,27 @@ func TestAuthenticatorChi(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		args args
-		want []byte
+		name     string
+		args     args
+		wantCode int
+		wantBody []byte
 	}{
-		{name: "GET", args: args{method: "GET", path: "/get"}, want: []byte("USERAUTH")},
-		// TODO: write for other methods
+		{name: "GET", args: args{method: "GET", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "POST", args: args{method: "POST", path: "/get"}, wantCode: 405, wantBody: []byte{}},
+		{name: "POST2", args: args{method: "POST", path: "/post"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
 	}
 
 	for _, tt := range tests {
 		request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, request)
-		got := response.Body.Bytes()
-		if !bytes.Equal(tt.want, got) {
-			t.Errorf("got %s, want %s", got, tt.want)
+		gotCode := response.Code
+		if tt.wantCode != gotCode {
+			t.Errorf("%s: got %d, wantCode %d", tt.name, gotCode, tt.wantCode)
+		}
+		gotBytes := response.Body.Bytes()
+		if !bytes.Equal(tt.wantBody, gotBytes) {
+			t.Errorf("%s: got %s, want %s", tt.name, gotBytes, tt.wantBody)
 		}
 	}
 }
