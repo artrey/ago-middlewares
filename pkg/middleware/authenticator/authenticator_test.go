@@ -30,6 +30,11 @@ func TestAuthenticatorHTTPMux(t *testing.T) {
 			}
 			data := profile.(string)
 
+			if data == "USERAUTH" && request.RemoteAddr != "192.0.2.1" {
+				writer.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
 			_, err = writer.Write([]byte(data))
 			if err != nil {
 				t.Fatal(err)
@@ -40,6 +45,7 @@ func TestAuthenticatorHTTPMux(t *testing.T) {
 	type args struct {
 		method string
 		path   string
+		addr   string
 	}
 
 	tests := []struct {
@@ -48,13 +54,15 @@ func TestAuthenticatorHTTPMux(t *testing.T) {
 		wantCode int
 		wantBody []byte
 	}{
-		{name: "GET", args: args{method: "GET", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
-		{name: "POST", args: args{method: "POST", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
-		{name: "POST2", args: args{method: "POST", path: "/post"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
+		{name: "GET", args: args{method: "GET", path: "/get", addr: "192.0.2.1"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "POST", args: args{method: "POST", path: "/get", addr: "192.0.2.1"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "Not found", args: args{method: "POST", path: "/post", addr: "192.0.2.1"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
+		{name: "No access", args: args{method: "POST", path: "/get", addr: "127.0.0.1"}, wantCode: 401, wantBody: []byte{}},
 	}
 
 	for _, tt := range tests {
 		request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
+		request.RemoteAddr = tt.args.addr
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, request)
 		gotCode := response.Code
@@ -89,6 +97,11 @@ func TestAuthenticatorChi(t *testing.T) {
 			}
 			data := profile.(string)
 
+			if data == "USERAUTH" && request.RemoteAddr != "192.0.2.1" {
+				writer.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
 			_, err = writer.Write([]byte(data))
 			if err != nil {
 				t.Fatal(err)
@@ -99,6 +112,7 @@ func TestAuthenticatorChi(t *testing.T) {
 	type args struct {
 		method string
 		path   string
+		addr   string
 	}
 
 	tests := []struct {
@@ -107,13 +121,15 @@ func TestAuthenticatorChi(t *testing.T) {
 		wantCode int
 		wantBody []byte
 	}{
-		{name: "GET", args: args{method: "GET", path: "/get"}, wantCode: 200, wantBody: []byte("USERAUTH")},
-		{name: "POST", args: args{method: "POST", path: "/get"}, wantCode: 405, wantBody: []byte{}},
-		{name: "POST2", args: args{method: "POST", path: "/post"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
+		{name: "GET", args: args{method: "GET", path: "/get", addr: "192.0.2.1"}, wantCode: 200, wantBody: []byte("USERAUTH")},
+		{name: "POST", args: args{method: "POST", path: "/get", addr: "192.0.2.1"}, wantCode: 405, wantBody: []byte{}},
+		{name: "Not found", args: args{method: "POST", path: "/post", addr: "192.0.2.1"}, wantCode: 404, wantBody: []byte("404 page not found\n")},
+		{name: "No access", args: args{method: "GET", path: "/get", addr: "127.0.0.1"}, wantCode: 401, wantBody: []byte{}},
 	}
 
 	for _, tt := range tests {
 		request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
+		request.RemoteAddr = tt.args.addr
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, request)
 		gotCode := response.Code
